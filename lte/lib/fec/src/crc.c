@@ -75,82 +75,108 @@ unsigned long reversecrcbit(unsigned int crc, int nbits, crc_t *crc_params) {
 	return((crc ^ crc_params->crcxor) & crc_params->crcmask);
 }
 
+int crc_set_init(crc_t *crc_par, unsigned long crc_init_value){
+	
+	crc_par->crcinit=crc_init_value; 
+	if (crc_par->crcinit != (crc_par->crcinit & crc_par->crcmask)) {
+		printf("ERROR, invalid crcinit in crc_set_init().\n");
+		return(-1);
+	}
+	return(0);
+}
+int crc_set_xor(crc_t *crc_par, unsigned long crc_xor_value){
+	
+	crc_par->crcxor=crc_xor_value;
+	if (crc_par->crcxor != (crc_par->crcxor & crc_par->crcmask)) {
+		printf("ERROR, invalid crcxor in crc_set_xor().\n");
+		return(-1);
+	}
+	return(0);
+}
 
-int crc_init(crc_t *crc_par){
+int crc_init(crc_t *crc_par, unsigned int crc_poly, int crc_order){
+
+	// Set crc working default parameters 	
+	crc_par->polynom=crc_poly;
+	crc_par->order=crc_order;
+	crc_par->crcinit=0x00000000; 
+	crc_par->crcxor=0x00000000;
 
 	// Compute bit masks for whole CRC and CRC high bit
 	crc_par->crcmask = ((((unsigned long)1<<(crc_par->order-1))-1)<<1)|1;
 	crc_par->crchighbit = (unsigned long)1<<(crc_par->order-1);
 
-	printf("crcmask=%x, crchightbit=%x\n", 
-			(unsigned int)crc_par->crcmask, (unsigned int)crc_par->crchighbit);
-
 	// check parameters
 	if (crc_par->order%8 != 0) {
 		printf("ERROR, invalid order=%d, it must be 8, 16, 24 or 32.\n", crc_par->order);
-		return(0);
+		return(-1);
 	}
+	if(crc_set_init( crc_par, crc_par->crcxor))return(-1);
+	if(crc_set_xor( crc_par, crc_par->crcxor))return(-1);
 
-	if (crc_par->crcinit != (crc_par->crcinit & crc_par->crcmask)) {
-		printf("ERROR, invalid crcinit.\n");
-		return(0);
-	}
-	if (crc_par->crcxor != (crc_par->crcxor & crc_par->crcmask)) {
-		printf("ERROR, invalid crcxor.\n");
-		return(0);
-	}
 	// generate lookup table
 	gen_crc_table(crc_par);
 
-	return(1);
+	// Alloocate memory
+	crc_par->data0 = (unsigned char *)malloc(sizeof(*crc_par->data0) * (MAX_LENGTH+crc_par->order));
+	if (!crc_par->data0) {
+		perror("malloc ERROR: Allocating memory for data pointer in crc() function");
+		return(-1);
+	}
+
+	return(0);
 }
+
+void crc_free(crc_t *crc_p){
+	free(crc_p->data0);
+	crc_p->data0=NULL;
+}
+
+//ELIMINATE
+unsigned int crc(unsigned int crc, char *bufptr, int len,
+		int long_crc, unsigned int poly, int paste_word){
+
+	return(1);
+};
+/////
 
 
 unsigned int crc_attach(char *bufptr, int len, crc_t *crc_params) {
 
-	int i, len8, res8, a;
+	int i, len8, res8, a=0;
 	unsigned int crc;
 	char *pter;
 
-#ifdef _WITHMALLOC
-	crc_params->data0 = (unsigned char *)malloc(sizeof(*crc_params->data0) * (len+crc_params->order)*2);
-	if (!crc_params->data0) {
-		perror("malloc ERROR: Allocating memory for data pointer in crc() function");
+	if(len > MAX_LENGTH){
+		perror("Data lenght ERROR: Input data lenght exceeds available memory (MAX_LENGTH)");
 		return(-1);
 	}
-#else
-	if((((len+crc_params->order)>>3) + 1) > MAX_LENGTH){
-		printf("ERROR: Not enough memory allocated\n");
-		return(-1);
-	}
-#endif
+
 	//# Pack bits into bytes 
 	len8=(len>>3);
-	res8=8-(len - (len8<<3));
+	res8=(len - (len8<<3));
 	if(res8>0)a=1;
-	else a=0;
 
-	// Zeroed additional bits
-	memset((char *)(bufptr+len),0,(32)*sizeof(char));
-
-	for(i=0; i<len8+a; i++){
+	// Move to char format
+	for(i=0; i<len8; i++){
 		pter=(char *)(bufptr+8*i);
 		crc_params->data0[i]=(unsigned char)(unpack_bits(&pter, 8)&0xFF);
 	}
+	crc_params->data0[len8]=0x00;
+	for(i=0; i<res8; i++){
+		crc_params->data0[len8] |= ((unsigned char)*(pter+i))<<(7-i);
+	}
+
 	// Calculate CRC
 	crc=crctable(len8+a, crc_params);
 
 	// Reverse CRC res8 positions
-	if(a==1)crc=reversecrcbit(crc, res8, crc_params);
+	if(a==1)crc=reversecrcbit(crc, 8-res8, crc_params);
 
 	// Add CRC
 	pter=(char *)(bufptr+len);
 	pack_bits(crc, &pter, crc_params->order);
 
-#ifdef _WITHMALLOC
-	free(crc_params->data0);
-	crc_params->data0=NULL;
-#endif
 	//Return CRC value
 	return crc;
 }

@@ -36,19 +36,11 @@
 #define LTE_CRC8	0x19B
 
 
-#define _WITHMALLOC
-
-#ifndef _WITHMALLOC
 #define MAX_LENGTH	1024*16
-#endif
 
 typedef struct {
 	unsigned long table[256];
-#ifdef _WITHMALLOC
 	unsigned char *data0;
-#else
-	unsigned char data0[MAX_LENGTH];
-#endif
 	int polynom;
 	int order;
 	unsigned long crcinit; 
@@ -58,8 +50,12 @@ typedef struct {
 	unsigned int crc_out;
 } crc_t;
 
+unsigned int crc(unsigned int crc, char *bufptr, int len,
+		int long_crc, unsigned int poly, int paste_word);
 
-int crc_init(crc_t *crc_par);
+void crc_free(crc_t *crc_p);
+int crc_init(crc_t *crc_par, unsigned int crc_poly, int crc_order);
+int crc_set_init(crc_t *crc_par, unsigned long crc_init_value);
+int crc_set_xor(crc_t *crc_par, unsigned long crc_xor_value);
 unsigned int crc_attach(char *bufptr, int len, crc_t *crc_params);
-
 #endif

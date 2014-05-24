@@ -37,7 +37,7 @@
 #include "lte.h"
 #include "crc_test.h"
 
-int num_bits = 5000, crc_length = 24;
+int num_bits = 5001, crc_length = 24;
 unsigned int crc_poly = 0x1864CFB;
 unsigned int seed = 1;
 
@@ -81,7 +81,7 @@ int main(int argc, char **argv) {
 
 	parse_args(argc, argv);
 
-	data = malloc(sizeof(char) * (num_bits+crc_length)*2);
+	data = malloc(sizeof(char) * (num_bits+crc_length*2));
 	if (!data) {
 		perror("malloc");
 		exit(-1);
@@ -98,11 +98,9 @@ int main(int argc, char **argv) {
 	}
 
 	//Initialize CRC params and tables
-	crc_p.polynom=crc_poly;
-	crc_p.order=crc_length;
-	crc_p.crcinit=0x00000000; 
-	crc_p.crcxor=0x00000000;
-	if(!crc_init(&crc_p))exit(0);
+	if(crc_init(&crc_p, crc_poly, crc_length))exit(-1);
+	if(crc_set_init( &crc_p, 0x00000000))exit(-1);
+	if(crc_set_xor( &crc_p, 0x00000000))exit(-1);
 
 	// generate CRC word
 	crc_word = crc_attach(data, num_bits, &crc_p);
@@ -113,6 +111,7 @@ int main(int argc, char **argv) {
 		exit(-1);
 	}
 
+	crc_free(&crc_p);
 	free(data);
 
 	// check if generated word is as expected
