@@ -106,12 +106,12 @@ int main(int argc, char **argv) {
 	crc_word = crc_attach(data, num_bits, &crc_p);
 
 	// check if result is zero
+	if(crc_set_init( &crc_p, 0x00000000))exit(-1);
 	if (crc_attach(data, num_bits + crc_length, &crc_p)) {
 		printf("CRC check is non-zero\n");
 		exit(-1);
 	}
 
-	crc_free(&crc_p);
 	free(data);
 
 	// check if generated word is as expected

@@ -40,7 +40,7 @@
 
 typedef struct {
 	unsigned long table[256];
-	unsigned char *data0;
+	unsigned char byte;
 	int polynom;
 	int order;
 	unsigned long crcinit; 
@@ -53,7 +53,6 @@ typedef struct {
 unsigned int crc(unsigned int crc, char *bufptr, int len,
 		int long_crc, unsigned int poly, int paste_word);
 
-void crc_free(crc_t *crc_p);
 int crc_init(crc_t *crc_par, unsigned int crc_poly, int crc_order);
 int crc_set_init(crc_t *crc_par, unsigned long crc_init_value);
 int crc_set_xor(crc_t *crc_par, unsigned long crc_xor_value);

@@ -51,16 +51,15 @@ void gen_crc_table(crc_t *crc_params) {
 }
 
 
-unsigned long  crctable (unsigned long length, crc_t *crc_params) {
+unsigned long  crctable (crc_t *crc_params) {
 
 	// Polynom order 8, 16, 24 or 32 only.
 	int ord=crc_params->order-8;
 	unsigned long crc = crc_params->crcinit;
-	unsigned char* data = crc_params->data0;
+	unsigned char byte = crc_params->byte;
 
-	while (length--){
-		 crc = (crc << 8) ^ crc_params->table[ ((crc >> (ord)) & 0xff) ^ *data++];
-	}
+	crc = (crc << 8) ^ crc_params->table[ ((crc >> (ord)) & 0xff) ^ byte];
+	crc_params->crcinit = crc;
 	return((crc ^ crc_params->crcxor) & crc_params->crcmask);
 }
 
@@ -117,20 +116,10 @@ int crc_init(crc_t *crc_par, unsigned int crc_poly, int crc_order){
 	// generate lookup table
 	gen_crc_table(crc_par);
 
-	// Alloocate memory
-	crc_par->data0 = (unsigned char *)malloc(sizeof(*crc_par->data0) * (MAX_LENGTH+crc_par->order));
-	if (!crc_par->data0) {
-		perror("malloc ERROR: Allocating memory for data pointer in crc() function");
-		return(-1);
-	}
-
 	return(0);
 }
 
-void crc_free(crc_t *crc_p){
-	free(crc_p->data0);
-	crc_p->data0=NULL;
-}
+
 
 //ELIMINATE
 unsigned int crc(unsigned int crc, char *bufptr, int len,
@@ -143,8 +132,8 @@ unsigned int crc(unsigned int crc, char *bufptr, int len,
 
 unsigned int crc_attach(char *bufptr, int len, crc_t *crc_params) {
 
-	int i, len8, res8, a=0;
-	unsigned int crc;
+	int i, k, len8, res8, a=0;
+	unsigned int crc=0;
 	char *pter;
 
 	if(len > MAX_LENGTH){
@@ -157,18 +146,19 @@ unsigned int crc_attach(char *bufptr, int len, crc_t *crc_params) {
 	res8=(len - (len8<<3));
 	if(res8>0)a=1;
 
-	// Move to char format
-	for(i=0; i<len8; i++){
-		pter=(char *)(bufptr+8*i);
-		crc_params->data0[i]=(unsigned char)(unpack_bits(&pter, 8)&0xFF);
-	}
-	crc_params->data0[len8]=0x00;
-	for(i=0; i<res8; i++){
-		crc_params->data0[len8] |= ((unsigned char)*(pter+i))<<(7-i);
-	}
-
 	// Calculate CRC
-	crc=crctable(len8+a, crc_params);
+	for(i=0; i<len8+a; i++){
+		pter=(char *)(bufptr+8*i);
+		if(i==len8){
+			crc_params->byte=0x00;
+			for(k=0; k<res8; k++){
+				crc_params->byte |= ((unsigned char)*(pter+k))<<(7-k);
+			}
+		}else{
+			crc_params->byte=(unsigned char)(unpack_bits(&pter, 8)&0xFF);
+		}
+		crc=crctable(crc_params);
+	}
 
 	// Reverse CRC res8 positions
 	if(a==1)crc=reversecrcbit(crc, 8-res8, crc_params);
